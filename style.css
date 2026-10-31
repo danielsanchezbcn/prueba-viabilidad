@@ -58,7 +58,7 @@ dd { margin: 0; overflow-wrap: anywhere; }
 .fields { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; margin: 0.5rem 0; }
 .fields label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.9rem; color: var(--muted); }
 .fields label.check { flex-direction: row; align-items: center; gap: 0.4rem; color: var(--text); }
-input[type="number"], input[type="password"], input[type="file"] {
+select, input[type="number"], input[type="password"], input[type="file"] {
   font: inherit;
   padding: 0.35rem 0.5rem;
   border: 1px solid var(--line);

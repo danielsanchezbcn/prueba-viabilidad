@@ -6,6 +6,11 @@ const $ = (id) => document.getElementById(id);
 const fmt = (n) => Number(n).toLocaleString('es-ES');
 const mb = (b) => (b / 1048576).toFixed(1) + ' MB';
 const results = {};
+const eventos = [];
+results.eventos = eventos; // cronología de las operaciones realizadas en esta apertura de la página
+function evento(tipo, datos = {}) {
+  eventos.push({ momento: new Date().toISOString(), tipo, ...datos });
+}
 let database = null;
 let pendingRestore = null; // { inner, summary }
 
@@ -123,6 +128,7 @@ async function requestPersistence() {
   const concedida = await navigator.storage.persist();
   const despues = await navigator.storage.persisted();
   results.persistencia = { antes, respuesta: concedida, despues };
+  evento('persistencia', { antes, respuesta: concedida, despues });
   if (despues) setStatus('persist-status', 'Correcto: el navegador marca el almacenamiento de este sitio como persistente.', 'ok');
   else setStatus('persist-status', 'No concedida: el navegador puede borrar estos datos si falta espacio. Las copias de seguridad siguen siendo imprescindibles.', 'warn');
   log(`Persistencia: antes=${antes}, respuesta=${concedida}, después=${despues}`, despues ? 'ok' : 'info');
@@ -187,6 +193,7 @@ async function generate() {
     usoDespues: usoDespues === null ? null : mb(usoDespues),
   };
   log(msg + (usoAntes !== null ? ` Uso estimado del sitio: ${mb(usoAntes)} → ${mb(usoDespues)} (estimación del navegador, aproximada).` : ''), 'ok');
+  evento('generacion', { recuentos: counts, msGuardar: Math.round(t2 - t1) });
   await refreshFound();
   await showEnv();
 }
@@ -199,10 +206,16 @@ async function countRecords() {
 
 async function deleteData() {
   if (!confirm('Se borrarán todos los datos de prueba de este navegador (no la carpeta recordada). ¿Continuar?')) return;
+  const antes = await db.countAll(database);
+  const t0 = performance.now();
   await db.clearAll(database);
-  setStatus('data-status', 'Datos de prueba borrados.', 'ok');
-  results.borrado = { ok: true, recuentos: await db.countAll(database) };
-  log('Datos de prueba borrados.', 'ok');
+  const ms = Math.round(performance.now() - t0);
+  const tras = await db.countAll(database);
+  const vacia = Object.values(tras).every((n) => n === 0);
+  setStatus('data-status', vacia ? `Correcto: datos de prueba borrados en ${ms} ms.` : 'Fallo: quedan registros tras el borrado.', vacia ? 'ok' : 'fail');
+  results.borrado = { ok: vacia, msBorrar: ms, recuentosAntes: antes, recuentosTras: tras };
+  evento('borrado', { ok: vacia, msBorrar: ms, recuentosAntes: antes, recuentosTras: tras });
+  log(vacia ? `Datos de prueba borrados (${ms} ms).` : 'El borrado no dejó la base vacía.', vacia ? 'ok' : 'error');
   await refreshFound();
   await showEnv();
 }
@@ -251,6 +264,7 @@ async function writeToHandle(fileHandle, blob) {
 function reportBackup(kind, made, writtenSize) {
   const sizeOk = writtenSize === undefined ? null : writtenSize === made.blob.size;
   results.copia = {
+    momento: new Date().toISOString(),
     destino: kind,
     nombre: made.name,
     tamano: mb(made.blob.size),
@@ -260,6 +274,8 @@ function reportBackup(kind, made, writtenSize) {
     checksum: made.inner.checksum.slice(0, 16) + '…',
     tamanoEscritoCoincide: sizeOk,
   };
+  (results.copias ??= []).push(results.copia);
+  evento('copia', results.copia);
   const msg = `Copia «${made.name}» (${mb(made.blob.size)}) creada en ${made.ms} ms · destino: ${kind}${sizeOk === null ? '' : sizeOk ? ' · tamaño escrito verificado' : ' · AVISO: el tamaño escrito no coincide'}.`;
   setStatus('backup-status', (sizeOk === false ? 'Revisar: ' : 'Correcto: ') + msg, sizeOk === false ? 'fail' : 'ok');
   log(msg, sizeOk === false ? 'error' : 'ok');
@@ -280,11 +296,11 @@ async function saveWithPicker() {
   }
 }
 
-async function dirHandleStatus() {
+async function dirHandleStatus(etiqueta = 'carpeta') {
   const handle = await db.getKv(database, 'dirHandle');
   if (!handle) {
     setStatus('dir-status', 'No hay carpeta recordada.');
-    results.carpeta = { recordada: false };
+    results[etiqueta] = { recordada: false };
     return null;
   }
   let perm = 'desconocido';
@@ -293,7 +309,7 @@ async function dirHandleStatus() {
   } catch {
     /* sin soporte */
   }
-  results.carpeta = { recordada: true, nombre: handle.name, permisoAlAbrir: perm };
+  results[etiqueta] = { recordada: true, nombre: handle.name, permiso: perm };
   setStatus('dir-status', `Carpeta recordada: «${handle.name}» · permiso de escritura: ${perm === 'granted' ? 'concedido' : perm === 'prompt' ? 'hay que volver a concederlo (un clic)' : perm}.`, perm === 'granted' ? 'ok' : 'warn');
   return handle;
 }
@@ -303,20 +319,35 @@ async function pickDirectory() {
   const dir = await window.showDirectoryPicker({ mode: 'readwrite', id: 'copias-dashboard' });
   await db.putKv(database, 'dirHandle', dir);
   log(`Carpeta elegida y guardada en el navegador: ${dir.name}`, 'ok');
-  await dirHandleStatus();
+  evento('carpetaElegida', { nombre: dir.name });
+  await dirHandleStatus('carpetaTrasElegir');
 }
 
 async function saveToRememberedDir() {
   const handle = await db.getKv(database, 'dirHandle');
   if (!handle) throw new Error('Primero elige una carpeta.');
+  let permisoAntes = 'desconocido';
+  try {
+    permisoAntes = await handle.queryPermission({ mode: 'readwrite' });
+  } catch {
+    /* sin soporte */
+  }
   const perm = await handle.requestPermission({ mode: 'readwrite' });
-  results.carpeta = { ...(results.carpeta ?? {}), permisoTrasSolicitar: perm };
-  if (perm !== 'granted') throw new Error('No se concedió permiso de escritura en la carpeta.');
+  const entrada = { carpeta: handle.name, permisoAntes, permisoTrasSolicitar: perm, guardado: false };
+  (results.guardadoEnCarpeta ??= []).push(entrada);
+  if (perm !== 'granted') {
+    evento('guardadoEnCarpeta', entrada);
+    throw new Error('No se concedió permiso de escritura en la carpeta.');
+  }
   const made = await makeBackup();
   const fileHandle = await handle.getFileHandle(made.name, { create: true });
   const size = await writeToHandle(fileHandle, made.blob);
+  entrada.guardado = true;
+  entrada.archivo = made.name;
+  entrada.tamanoCoincide = size === made.blob.size;
+  evento('guardadoEnCarpeta', entrada);
   reportBackup(`carpeta recordada (${handle.name})`, made, size);
-  await dirHandleStatus();
+  await dirHandleStatus('carpetaTrasGuardar');
 }
 
 // ---------- 5. Restauración ----------
@@ -339,11 +370,13 @@ async function readAndValidate() {
   if (!v.ok) {
     setStatus('restore-status', 'La copia no es válida: ' + v.errors.join(' '), 'fail');
     results.restauracion = { validada: false, errores: v.errors };
+    evento('validacion', { fichero: file.name, ok: false, errores: v.errors });
     log('Copia rechazada: ' + v.errors.join(' | '), 'error');
     return;
   }
   const c = v.summary.counts;
-  pendingRestore = { inner: decoded.inner, summary: v.summary };
+  pendingRestore = { inner: decoded.inner, summary: v.summary, encrypted: decoded.encrypted, compression: decoded.compression, fileName: file.name };
+  evento('validacion', { fichero: file.name, ok: true, cifrada: decoded.encrypted, compresion: decoded.compression, recuentos: v.summary.counts });
   setStatus('restore-status', `Copia válida: creada el ${new Date(v.summary.createdAt).toLocaleString('es-ES')} · versión de esquema ${v.summary.schemaVersion} · ${fmt(c.players)} jugadores, ${fmt(c.sessions)} sesiones, ${fmt(c.repvalues)} valores${decoded.encrypted ? ' · cifrada' : ''}${decoded.compression === 'gzip' ? ' · comprimida' : ''}. Pulsa «Restaurar» para reemplazar los datos actuales.`, 'ok');
   results.restauracion = { validada: true, resumen: v.summary };
   log('Copia leída y validada (suma de verificación correcta).', 'ok');
@@ -363,6 +396,9 @@ async function restore() {
   const checksum = await core.checksumTables(after);
   const match = checksum === pendingRestore.inner.checksum;
   results.restauracion = { ...results.restauracion, restaurada: true, msRestaurar: Math.round(t1 - t0), checksumCoincide: match };
+  const entradaRestauracion = { fichero: pendingRestore.fileName, cifrada: pendingRestore.encrypted, compresion: pendingRestore.compression, recuentosAntes: current, recuentosDespues: await db.countAll(database), msRestaurar: Math.round(t1 - t0), checksumCoincide: match };
+  (results.restauraciones ??= []).push(entradaRestauracion);
+  evento('restauracion', entradaRestauracion);
   setStatus('restore-status', match ? `Correcto: restauración completada en ${Math.round(t1 - t0)} ms y verificada (los datos son idénticos a la copia).` : 'Fallo: la restauración terminó pero la verificación no coincide.', match ? 'ok' : 'fail');
   log(match ? 'Restauración verificada: suma de verificación idéntica.' : 'La verificación posterior a la restauración NO coincide.', match ? 'ok' : 'error');
   pendingRestore = null;
@@ -392,6 +428,7 @@ async function testCsp() {
   document.removeEventListener('securitypolicyviolation', handler);
   const blocked = violations.filter((v) => v.startsWith('connect-src')).length;
   const pass = hasMeta && blocked === targets.length;
+  evento('csp', { correcto: pass });
   results.csp = { metaPresente: hasMeta, violacionesConnectSrc: blocked, intentos: targets.length, resultados: outcomes, correcto: pass };
   if (pass) setStatus('csp-status', `Correcto: la política de seguridad bloqueó los ${blocked} intentos de conexión.`, 'ok');
   else setStatus('csp-status', `Fallo: solo ${blocked} de ${targets.length} intentos fueron bloqueados por la política${hasMeta ? '' : ' (no se encuentra la política en la página)'}. Revisa el informe.`, 'fail');
@@ -401,33 +438,65 @@ async function testCsp() {
 
 // ---------- Benchmark ----------
 
+function compactResult(r) {
+  const v = r.verificacion;
+  const out = {
+    id: r.id,
+    descripcion: r.descripcion,
+    durabilidad: { solicitada: r.durabilidad.solicitada, efectiva: r.durabilidad.efectiva, relajadaAplicada: r.durabilidad.relajadaAplicada, resumen: r.durabilidad.resumen },
+    filasTotales: r.filasTotales,
+    msEscribir: r.msEscribir,
+    msLeer: r.msLeer,
+    msAgregar: r.msAgregar,
+    msVerificar: r.msVerificar,
+    verificacion: {
+      ok: v.ok,
+      filasCoinciden: v.filas.coinciden,
+      valores: `${v.valores.leidos}/${v.valores.esperados}`,
+      porSesion: { leidos: v.porSesion.leidos, distintos: v.porSesion.distintos },
+      porVariable: { leidos: v.porVariable.leidos, distintos: v.porVariable.distintos },
+      porSesionYVariable: { leidos: v.porSesionYVariable.leidos, distintos: v.porSesionYVariable.distintos },
+      porRepeticionYVariable: v.porRepeticionYVariable,
+      sha256CeldasCoincide: v.resumenSha256.coincide,
+      sha256ParesCoincide: v.resumenSha256Pares.coincide,
+    },
+  };
+  if (!v.ok) out.verificacionDetalle = v; // el detalle completo (con ejemplos) solo si algo falla
+  return out;
+}
+
 async function runBenchmark() {
-  const params = { players: 40, sessionsPerPlayer: 60, repsPerSession: 5, variables: 19, seed: 1 };
+  const scale = bench.SCALES.find((x) => x.id === $('bench-scale').value) ?? bench.SCALES[0];
+  const params = scale.params;
+  const variants = bench.VARIANTS.filter((v) => $('bench-all').checked || ['V2', 'V4', 'V6'].includes(v.id));
+  setStatus('bench-status', 'Generando datos sintéticos y la referencia de verificación…');
   const longTables = core.generateSynthetic(params);
   const wideTables = bench.toWide(longTables, params.variables);
-  setStatus('bench-status', 'Calculando la referencia de verificación a partir de los datos de origen…');
+  const wideObjTables = bench.toWideObject(longTables);
   const reference = await bench.buildReference(longTables);
   const out = [];
-  for (const variant of bench.VARIANTS) {
-    setStatus('bench-status', `Ejecutando ${variant.id} (${out.length + 1} de ${bench.VARIANTS.length})… no cierres la pestaña.`);
+  for (const variant of variants) {
+    setStatus('bench-status', `Ejecutando ${variant.id} (${out.length + 1} de ${variants.length})… no cierres la pestaña.`);
     log(`Benchmark ${variant.id}: ${variant.label}`);
-    const r = await bench.runVariant(variant, { longTables, wideTables }, reference);
+    const r = await bench.runVariant(variant, { longTables, wideTables, wideObjTables }, reference);
     out.push(r);
     const v = r.verificacion;
     log(`${variant.id}: escribir ${fmt(r.msEscribir)} ms · leer ${fmt(r.msLeer)} ms · agregar ${fmt(r.msAgregar)} ms · ${fmt(r.filasTotales)} filas`, 'ok');
     log(`${variant.id} durabilidad: ${r.durabilidad.resumen}`);
-    log(`${variant.id} verificación: ${v.ok ? 'correcta' : 'FALLIDA'} · valores ${fmt(v.valores.leidos)}/${fmt(v.valores.esperados)} · sesiones ${fmt(v.porSesion.leidos)} (${v.porSesion.distintos} distintas) · variables ${fmt(v.porVariable.leidos)} (${v.porVariable.distintos} distintas) · sesión×variable ${fmt(v.porSesionYVariable.leidos)} (${v.porSesionYVariable.distintos} distintas) · repetición×variable ${fmt(v.porRepeticionYVariable.comprobados)} pares comprobados (${fmt(v.porRepeticionYVariable.distintos)} difieren; SHA-256 de pares ${v.resumenSha256Pares.coincide ? 'coincide' : 'NO coincide'})`, v.ok ? 'ok' : 'error');
+    log(`${variant.id} verificación: ${v.ok ? 'correcta' : 'FALLIDA'} · valores ${fmt(v.valores.leidos)}/${fmt(v.valores.esperados)} · sesión×variable ${v.porSesionYVariable.distintos} distintas · repetición×variable ${fmt(v.porRepeticionYVariable.comprobados)} pares (${fmt(v.porRepeticionYVariable.distintos)} difieren)`, v.ok ? 'ok' : 'error');
   }
   const allOk = out.every((r) => r.verificacion.ok);
-  results.benchmark = {
-    escala: params,
+  const entrada = {
+    escala: { id: scale.id, descripcion: scale.label, parametros: params },
     referencia: { ...reference.expected, resumenSha256: reference.digest.slice(0, 16) + '…', resumenSha256Pares: reference.pairsDigest.slice(0, 16) + '…' },
+    variantesIncluidas: out.map((r) => r.id),
     verificacionCompleta: allOk,
-    resultados: out,
+    resultados: out.map(compactResult),
   };
+  (results.benchmarks ??= []).push(entrada);
+  evento('benchmark', { escala: scale.id, variantes: entrada.variantesIncluidas, verificacionCompleta: allOk });
   const times = out.map((r) => `${r.id} ${(r.msEscribir / 1000).toFixed(1)} s`).join(' · ');
-  const relaxed = out.filter((r) => r.durabilidad.solicitada === 'relaxed').map((r) => `${r.id}: ${r.durabilidad.relajadaAplicada === true ? 'aplicada' : r.durabilidad.relajadaAplicada === false ? 'NO aplicada' : 'no verificable'}`).join(', ');
-  setStatus('bench-status', (allOk ? 'Correcto: ' : 'Fallo de verificación: ') + times + ` · durabilidad relajada → ${relaxed} · verificación contra los datos de origen ${allOk ? 'correcta en las cinco variantes' : 'fallida en alguna variante (ver informe)'}.`, allOk ? 'ok' : 'fail');
+  setStatus('bench-status', (allOk ? 'Correcto: ' : 'Fallo de verificación: ') + `escala «${scale.id}» · escritura: ${times} · verificación contra los datos de origen ${allOk ? 'correcta' : 'fallida (ver informe)'}.`, allOk ? 'ok' : 'fail');
   await showEnv();
 }
 
@@ -494,7 +563,8 @@ async function init() {
   await db.putKv(database, 'lastOpenAt', new Date().toISOString());
   log(prevOpen ? `Apertura anterior registrada: ${prevOpen}` : 'Primera apertura de esta página en este navegador.');
   await refreshFound(true);
-  await dirHandleStatus();
+  await dirHandleStatus('carpetaAlAbrir');
+  evento('apertura', { aperturaAnterior: prevOpen ?? null, datosEncontrados: results.alAbrir?.datosEncontrados });
   log('Página lista. Todo se ejecuta en este navegador; no hay peticiones a servidores.');
 }
 

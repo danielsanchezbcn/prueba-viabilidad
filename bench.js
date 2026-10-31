@@ -15,6 +15,15 @@ export const VARIANTS = [
   { id: 'V3', label: 'Filas largas, sin índices, durabilidad relajada', shape: 'long', indexes: false, durability: 'relaxed' },
   { id: 'V4', label: 'Filas anchas (1 por repetición, valores en una lista), sin índices', shape: 'wide', indexes: false, durability: 'default' },
   { id: 'V5', label: 'Filas anchas, sin índices, durabilidad relajada', shape: 'wide', indexes: false, durability: 'relaxed' },
+  { id: 'V6', label: 'Filas anchas con los valores en un objeto por identificador de variable (v000…), sin índices', shape: 'wideObj', indexes: false, durability: 'default' },
+];
+
+// Escalas: «jugadores» son temporadas-jugador (4 temporadas × 25 jugadores = 100). 15 sesiones por jugador y temporada.
+// Repeticiones y variables por sesión están por definir: se prueban una cota alta y una baja.
+export const SCALES = [
+  { id: 'alta', label: 'Cota alta de tu volumen: 100 temporadas-jugador × 15 sesiones × 5 repeticiones × 19 variables (142.500 valores)', params: { players: 100, sessionsPerPlayer: 15, repsPerSession: 5, variables: 19, seed: 1 } },
+  { id: 'baja', label: 'Cota baja de tu volumen: 100 × 15 sesiones × 3 repeticiones × 3 variables (13.500 valores)', params: { players: 100, sessionsPerPlayer: 15, repsPerSession: 3, variables: 3, seed: 1 } },
+  { id: 'grande', label: 'Escala grande de la prueba anterior: 40 × 60 sesiones × 5 repeticiones × 19 variables (228.000 valores)', params: { players: 40, sessionsPerPlayer: 60, repsPerSession: 5, variables: 19, seed: 1 } },
 ];
 
 const STORES = ['players', 'sessions', 'repetitions', 'repvalues'];
@@ -44,6 +53,21 @@ export function toWide(tables, variables) {
   for (const rep of tables.repetitions) byRep.set(rep.id, { ...rep, values: new Array(variables).fill(null) });
   for (const v of tables.repvalues) byRep.get(v.repetitionId).values[v.variableIdx] = v.value;
   return { ...tables, repetitions: [...byRep.values()], repvalues: [] };
+}
+
+// Variante con un objeto por repetición: { v000: valor, v001: valor, … } (identificador estable de variable).
+export const variableId = (idx) => `v${String(idx).padStart(3, '0')}`;
+export function toWideObject(tables) {
+  const byRep = new Map();
+  for (const rep of tables.repetitions) byRep.set(rep.id, { ...rep, values: {} });
+  for (const v of tables.repvalues) byRep.get(v.repetitionId).values[variableId(v.variableIdx)] = v.value;
+  return { ...tables, repetitions: [...byRep.values()], repvalues: [] };
+}
+
+// Entradas [índice de variable, valor] de una fila ancha, sea lista (V4/V5) u objeto por identificador (V6).
+function valueEntries(values) {
+  if (Array.isArray(values)) return values.map((value, i) => [i, value]);
+  return Object.entries(values).map(([k, value]) => [Number(k.slice(1)), value]);
 }
 
 // ---------- Agregación exacta (enteros en milésimas) ----------
@@ -77,12 +101,12 @@ function cellsFromWide(repetitions) {
   const cells = new Map();
   let values = 0;
   for (const r of repetitions) {
-    r.values.forEach((value, variableIdx) => {
-      if (value !== null) {
+    for (const [variableIdx, value] of valueEntries(r.values)) {
+      if (value !== null && value !== undefined) {
         addCell(cells, r.sessionId, variableIdx, value);
         values++;
       }
-    });
+    }
   }
   return { cells, values };
 }
@@ -125,13 +149,13 @@ function pairsFromWide(repetitions) {
   const pairs = new Map();
   let duplicates = 0;
   for (const rep of repetitions) {
-    rep.values.forEach((value, variableIdx) => {
-      if (value !== null) {
+    for (const [variableIdx, value] of valueEntries(rep.values)) {
+      if (value !== null && value !== undefined) {
         const k = pairKey(rep.id, variableIdx);
         if (pairs.has(k)) duplicates++;
         pairs.set(k, milli(value));
       }
-    });
+    }
   }
   return { pairs, duplicates };
 }
@@ -296,10 +320,10 @@ function openWriteTx(db, variant) {
   return { tx, info };
 }
 
-export async function runVariant(variant, { longTables, wideTables }, reference, factory = globalThis.indexedDB) {
+export async function runVariant(variant, { longTables, wideTables, wideObjTables }, reference, factory = globalThis.indexedDB) {
   const name = `bench-1a-${variant.id}`;
   await deleteDb(name, factory);
-  const tables = variant.shape === 'long' ? longTables : wideTables;
+  const tables = variant.shape === 'long' ? longTables : variant.shape === 'wide' ? wideTables : wideObjTables;
   let db = null;
   try {
     db = await openBench(name, variant, factory);

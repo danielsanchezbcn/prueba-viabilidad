@@ -87,7 +87,17 @@
 
     <section class="card">
       <h2>7. Benchmark de escritura</h2>
-      <p>Compara cinco formas de guardar los mismos 228.000 valores sintéticos en bases temporales (no toca tus datos de prueba). Cada variante se verifica leyendo lo guardado y comparando recuentos, resultados por sesión y por variable, y cada par repetición × variable con los datos de origen, y el informe indica si la durabilidad relajada se aplicó de verdad. Las bases temporales se borran al terminar. Puede tardar entre uno y tres minutos: no cierres la pestaña.</p>
+      <p>Compara formas de guardar los mismos datos sintéticos en bases temporales (no toca tus datos de prueba). Cada variante se verifica leyendo lo guardado y comparando recuentos, resultados por sesión y por variable, y cada par repetición × variable con los datos de origen. El informe indica si la durabilidad relajada se aplicó de verdad. Las bases temporales se borran al terminar. No cierres la pestaña mientras se ejecuta.</p>
+      <div class="fields">
+        <label>Escala
+          <select id="bench-scale">
+            <option value="alta" selected>Cota alta de tu volumen (142.500 valores)</option>
+            <option value="baja">Cota baja de tu volumen (13.500 valores)</option>
+            <option value="grande">Escala grande de la prueba anterior (228.000 valores)</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="bench-all"> Incluir también V1, V3 y V5 (ya medidas: tardan más)</label>
+      </div>
       <div class="actions"><button type="button" id="btn-bench">Ejecutar benchmark</button></div>
       <p id="bench-status" class="status"></p>
     </section>

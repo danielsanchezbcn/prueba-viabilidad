@@ -33,24 +33,23 @@ Probado por mí con datos sintéticos: la lógica de copia, compresión, cifrado
 
 **No se ha podido probar** lo que depende de un navegador real: la respuesta a la solicitud de persistencia, los selectores de ficheros y carpetas, la tolerancia al tamaño real, el comportamiento tras cerrar y reabrir, y que la política de seguridad bloquee la red. Eso es justo lo que comprueba esta prueba en tu portátil.
 
-## Segunda ronda (versión spike-1a4)
+## Tercera ronda (versión spike-1a5)
 
-Cambios respecto a la entrega anterior: `bench.js` rehecho, y cambios en `app.js`, `core.js` e `index.html` (texto de la tarjeta 7). Sustituye esos cuatro ficheros en el repositorio; `db.js` y `style.css` no cambian. Después recarga la página forzando la caché (Ctrl+F5) y comprueba que el informe indica la versión `spike-1a4`. Tus datos de prueba anteriores se conservan, porque la URL no cambia.
+Sustituye en el repositorio estos cinco ficheros: `index.html`, `style.css`, `app.js`, `core.js` y `bench.js` (`db.js` no cambia). Recarga con Ctrl+F5 y comprueba que el informe indica `spike-1a5`. Tus datos de prueba anteriores se conservan.
 
-Qué hace ahora el benchmark (siempre en bases temporales, que se borran al terminar; no toca tus datos de prueba ni el modelo de datos principal):
+Qué cambia:
 
-- Calcula una referencia a partir de los datos de origen y, tras guardar cada variante, lee lo guardado y compara: recuento de filas (con `count()` y con las filas leídas), recuento de valores, resultados por sesión, por variable y por sesión × variable (n y suma exacta en milésimas) y un resumen SHA-256 del conjunto. Ya no se usa una media global única.
-- Compara además cada par repetición × variable (valor esperado frente a valor leído, en variantes long y wide). El informe indica cuántos pares se comprobaron, cuántos difieren (faltantes, sobrantes, con valor distinto o duplicados), hasta cinco ejemplos con repetición, variable, valor esperado y valor leído, y el resumen SHA-256 de los pares.
-- Para las variantes con durabilidad relajada, el informe indica si el navegador aceptó la opción y qué durabilidad efectiva declara la transacción. Si el navegador no la expone, el informe dice «no verificable» en lugar de suponer que se aplicó.
-- Por separado, se miden la escritura, la lectura y la agregación en memoria.
+- **Informe con cronología.** Ahora incluye `eventos` (qué operaciones hiciste y en qué orden), el historial completo de copias (`copias`), de restauraciones (`restauraciones`: con recuentos antes y después, tiempo y si la verificación coincide), de borrados y de guardados en carpeta. El estado de la carpeta se registra por separado al abrir (`carpetaAlAbrir`), tras elegirla (`carpetaTrasElegir`) y tras guardar (`carpetaTrasGuardar`), para distinguir si el permiso se conserva entre sesiones.
+- **Benchmark con tu volumen.** Escalas basadas en lo que has indicado (4 temporadas × 25 jugadores = 100 temporadas-jugador, 15 sesiones cada una): cota alta (5 repeticiones y 19 variables por sesión, 142.500 valores), cota baja (3 repeticiones y 3 variables, 13.500 valores) y la escala grande anterior. Por defecto solo se ejecutan V2 (filas largas), V4 (filas anchas con lista) y la nueva V6 (filas anchas con un objeto por identificador de variable, v000…), porque V1, V3 y V5 ya están medidas; se pueden incluir con la casilla.
+- **Informe del benchmark más corto.** Cada variante muestra los recuentos, las diferencias y si coinciden los resúmenes SHA-256; el detalle completo con ejemplos solo aparece si una verificación falla.
 
-Pasos que faltan del protocolo y el nuevo:
+Pasos (unos 15 minutos):
 
-1. Pulsa «Solicitar persistencia» y anota la respuesta.
-2. Cierra todas las ventanas de Chrome, ábrelo de nuevo y abre la URL: la tarjeta 3 debe indicar que hay datos de una sesión anterior, y la tarjeta 4 si la carpeta recordada pide permiso otra vez.
-3. «Guardar copia en la carpeta recordada» y una copia cifrada con contraseña.
-4. «Borrar datos de prueba», luego restaurar una copia (tarjeta 5) hasta que diga que la verificación coincide.
-5. «Ejecutar benchmark» (tarjeta 7): entre uno y tres minutos, sin cerrar la pestaña.
+1. **Ciclo de restauración.** Con datos de prueba en la base: «Guardar copia (elegir ubicación)»; «Borrar datos de prueba»; en la tarjeta 5 elige esa copia, «Leer y validar», «Restaurar». Debe indicar que la verificación coincide.
+2. **Copia cifrada.** Marca «Cifrar con contraseña» (8 caracteres o más), guarda una copia, borra los datos y restáurala con su contraseña.
+3. **Carpeta recordada.** «Elegir carpeta» (si ya hay una, vale la recordada). Cierra todas las ventanas de Chrome, reábrelo, abre la URL y pulsa «Guardar copia en la carpeta recordada».
+4. **Persistencia (opcional).** Guarda la página en favoritos y pulsa de nuevo «Solicitar persistencia».
+5. **Benchmark.** Escala «cota alta» con las variantes por defecto, y después «cota baja». Sin cerrar la pestaña.
 6. «Copiar informe» y pégalo en el chat.
 
-Pruebas realizadas por mí (Node con IndexedDB simulada, escala reducida de 4 jugadores × 6 sesiones): las cinco variantes verifican correctamente; se detectan un intercambio de dos variables dentro de una repetición (que la media global no detectaba), un intercambio del valor de una variable entre dos repeticiones de la misma sesión (que solo detecta la comparación por par), una fila perdida, un par duplicado, un valor sobrante, un cambio de 0,001 y un valor nulo; y se cubren los casos de durabilidad aplicada, no aplicada, rechazada y no verificable. Lo que depende del navegador real (tiempos, durabilidad efectiva) solo puede medirlo tu Chrome.
+Pruebas realizadas por mí (Node con IndexedDB simulada, escala reducida): las seis variantes verifican; se detectan intercambios dentro de una repetición y entre repeticiones de la misma sesión, filas o claves perdidas, claves sobrantes, pares duplicados y cambios de 0,001; y se cubren los casos de durabilidad. La copia, el cifrado, la restauración y la reversión de una restauración fallida también están probados. No he ejecutado el benchmark completo, porque depende de tu Chrome.

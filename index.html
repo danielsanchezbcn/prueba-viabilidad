@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Prueba de viabilidad, fase 1a</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Prueba de viabilidad, fase 1a</h1>
+    <p>Comprueba en este navegador si los datos persisten, si las copias se guardan y restauran, y si la red queda bloqueada. Usa solo datos sintéticos: no introduzcas datos reales.</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>1. Entorno</h2>
+      <dl id="env"></dl>
+      <div id="env-warn"></div>
+    </section>
+
+    <section class="card">
+      <h2>2. Persistencia del navegador</h2>
+      <p>Por defecto el navegador puede borrar los datos de un sitio si se queda sin espacio. Pide que los conserve y comprueba la respuesta.</p>
+      <div class="actions"><button type="button" id="btn-persist">Solicitar persistencia</button></div>
+      <p id="persist-status" class="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>3. Datos sintéticos en IndexedDB</h2>
+      <p id="found" class="status"></p>
+      <div class="fields">
+        <label>Jugadores <input type="number" id="n-players" value="40" min="1" max="200"></label>
+        <label>Sesiones por jugador <input type="number" id="n-sessions" value="60" min="1" max="500"></label>
+        <label>Repeticiones por sesión <input type="number" id="n-reps" value="5" min="1" max="20"></label>
+        <label>Variables por repetición <input type="number" id="n-vars" value="19" min="1" max="60"></label>
+      </div>
+      <div class="actions">
+        <button type="button" id="btn-gen">Generar y guardar</button>
+        <button type="button" id="btn-count" class="secondary">Contar registros</button>
+        <button type="button" id="btn-del" class="danger">Borrar datos de prueba</button>
+      </div>
+      <p id="data-status" class="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>4. Crear copia de seguridad</h2>
+      <div class="fields">
+        <label class="check"><input type="checkbox" id="opt-gzip"> Comprimir (gzip)</label>
+        <label class="check"><input type="checkbox" id="opt-pass-on"> Cifrar con contraseña</label>
+        <label>Contraseña (mínimo 8 caracteres) <input type="password" id="pass-backup" autocomplete="off" disabled></label>
+      </div>
+      <div class="actions">
+        <button type="button" id="btn-save">Guardar copia (elegir ubicación)</button>
+      </div>
+      <h3>Carpeta recordada</h3>
+      <p>Elige una carpeta (USB, carpeta sincronizada…) para comprobar si el navegador la recuerda entre sesiones.</p>
+      <div class="actions">
+        <button type="button" id="btn-pick-dir" class="secondary">Elegir carpeta</button>
+        <button type="button" id="btn-save-dir" class="secondary">Guardar copia en la carpeta recordada</button>
+      </div>
+      <p id="dir-status" class="status"></p>
+      <p id="backup-status" class="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>5. Restaurar copia</h2>
+      <p>La restauración reemplaza los datos de prueba actuales. Se valida el fichero y se muestra un resumen antes de confirmar.</p>
+      <div class="fields">
+        <label>Fichero de copia <input type="file" id="file-restore" accept=".json,application/json"></label>
+        <label>Contraseña (si la copia está cifrada) <input type="password" id="pass-restore" autocomplete="off"></label>
+      </div>
+      <div class="actions">
+        <button type="button" id="btn-read" class="secondary">Leer y validar</button>
+        <button type="button" id="btn-restore" disabled>Restaurar</button>
+      </div>
+      <p id="restore-status" class="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>6. Bloqueo de red (CSP)</h2>
+      <p>Intenta una conexión a una dirección que no existe (.invalid). No se envía ningún dato. Debe ser bloqueada por la política de seguridad de la página.</p>
+      <div class="actions"><button type="button" id="btn-csp">Probar bloqueo de red</button></div>
+      <p id="csp-status" class="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>7. Registro e informe</h2>
+      <pre id="log" aria-live="polite"></pre>
+      <div class="actions">
+        <button type="button" id="btn-report">Copiar informe</button>
+      </div>
+      <textarea id="report" readonly hidden rows="12" aria-label="Informe de resultados"></textarea>
+      <p id="report-status" class="status"></p>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 import * as core from './core.js';
 import * as db from './db.js';
+import * as bench from './bench.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Number(n).toLocaleString('es-ES');
@@ -397,6 +398,39 @@ async function testCsp() {
   log(`Prueba CSP: ${JSON.stringify(results.csp)}`, pass ? 'ok' : 'error');
 }
 
+
+// ---------- Benchmark ----------
+
+async function runBenchmark() {
+  const params = { players: 40, sessionsPerPlayer: 60, repsPerSession: 5, variables: 19, seed: 1 };
+  const longTables = core.generateSynthetic(params);
+  const wideTables = bench.toWide(longTables, params.variables);
+  setStatus('bench-status', 'Calculando la referencia de verificación a partir de los datos de origen…');
+  const reference = await bench.buildReference(longTables);
+  const out = [];
+  for (const variant of bench.VARIANTS) {
+    setStatus('bench-status', `Ejecutando ${variant.id} (${out.length + 1} de ${bench.VARIANTS.length})… no cierres la pestaña.`);
+    log(`Benchmark ${variant.id}: ${variant.label}`);
+    const r = await bench.runVariant(variant, { longTables, wideTables }, reference);
+    out.push(r);
+    const v = r.verificacion;
+    log(`${variant.id}: escribir ${fmt(r.msEscribir)} ms · leer ${fmt(r.msLeer)} ms · agregar ${fmt(r.msAgregar)} ms · ${fmt(r.filasTotales)} filas`, 'ok');
+    log(`${variant.id} durabilidad: ${r.durabilidad.resumen}`);
+    log(`${variant.id} verificación: ${v.ok ? 'correcta' : 'FALLIDA'} · valores ${fmt(v.valores.leidos)}/${fmt(v.valores.esperados)} · sesiones ${fmt(v.porSesion.leidos)} (${v.porSesion.distintos} distintas) · variables ${fmt(v.porVariable.leidos)} (${v.porVariable.distintos} distintas) · sesión×variable ${fmt(v.porSesionYVariable.leidos)} (${v.porSesionYVariable.distintos} distintas) · repetición×variable ${fmt(v.porRepeticionYVariable.comprobados)} pares comprobados (${fmt(v.porRepeticionYVariable.distintos)} difieren; SHA-256 de pares ${v.resumenSha256Pares.coincide ? 'coincide' : 'NO coincide'})`, v.ok ? 'ok' : 'error');
+  }
+  const allOk = out.every((r) => r.verificacion.ok);
+  results.benchmark = {
+    escala: params,
+    referencia: { ...reference.expected, resumenSha256: reference.digest.slice(0, 16) + '…', resumenSha256Pares: reference.pairsDigest.slice(0, 16) + '…' },
+    verificacionCompleta: allOk,
+    resultados: out,
+  };
+  const times = out.map((r) => `${r.id} ${(r.msEscribir / 1000).toFixed(1)} s`).join(' · ');
+  const relaxed = out.filter((r) => r.durabilidad.solicitada === 'relaxed').map((r) => `${r.id}: ${r.durabilidad.relajadaAplicada === true ? 'aplicada' : r.durabilidad.relajadaAplicada === false ? 'NO aplicada' : 'no verificable'}`).join(', ');
+  setStatus('bench-status', (allOk ? 'Correcto: ' : 'Fallo de verificación: ') + times + ` · durabilidad relajada → ${relaxed} · verificación contra los datos de origen ${allOk ? 'correcta en las cinco variantes' : 'fallida en alguna variante (ver informe)'}.`, allOk ? 'ok' : 'fail');
+  await showEnv();
+}
+
 // ---------- 7. Informe ----------
 
 async function copyReport() {
@@ -429,6 +463,7 @@ function wire() {
   on('btn-read', readAndValidate);
   on('btn-restore', restore, ['btn-read']);
   on('btn-csp', testCsp);
+  on('btn-bench', runBenchmark);
   on('btn-report', copyReport);
   $('opt-pass-on').addEventListener('change', (e) => {
     $('pass-backup').disabled = !e.target.checked;

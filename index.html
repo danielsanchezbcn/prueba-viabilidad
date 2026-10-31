@@ -86,7 +86,14 @@
     </section>
 
     <section class="card">
-      <h2>7. Registro e informe</h2>
+      <h2>7. Benchmark de escritura</h2>
+      <p>Compara cinco formas de guardar los mismos 228.000 valores sintéticos en bases temporales (no toca tus datos de prueba). Cada variante se verifica leyendo lo guardado y comparando recuentos, resultados por sesión y por variable, y cada par repetición × variable con los datos de origen, y el informe indica si la durabilidad relajada se aplicó de verdad. Las bases temporales se borran al terminar. Puede tardar entre uno y tres minutos: no cierres la pestaña.</p>
+      <div class="actions"><button type="button" id="btn-bench">Ejecutar benchmark</button></div>
+      <p id="bench-status" class="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>8. Registro e informe</h2>
       <pre id="log" aria-live="polite"></pre>
       <div class="actions">
         <button type="button" id="btn-report">Copiar informe</button>

@@ -5,7 +5,7 @@ export const FORMAT_ID = 'dashboard-backup-spike';
 export const ENVELOPE_ID = 'dashboard-backup-spike-envelope';
 export const FORMAT_VERSION = 1;
 export const SCHEMA_VERSION = 1;
-export const APP_VERSION = 'spike-1a';
+export const APP_VERSION = 'spike-1a4';
 export const DATA_STORES = ['players', 'sessions', 'repetitions', 'repvalues', 'meta'];
 export const PBKDF2_ITERATIONS = 600000;
 

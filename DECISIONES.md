@@ -27,8 +27,21 @@
 - Datos encontrados al reabrir la página: sí (creados a las 14:36 UTC y presentes al abrir a las 20:29 UTC, más de seis horas después). Ciclo completo de restauración, copia cifrada y carpeta recordada entre sesiones: pendientes de registrar.
 - Repetición del benchmark (misma versión, segunda ejecución): V1 25,2 s, V2 22,3 s, V3 22,6 s, V4 1,8 s, V5 1,7 s; variación entre ejecuciones del 4 al 18 % en las filas largas.
 
+## Resultados de la tercera ronda (spike-1a6, Chrome 156, Windows, 1 de noviembre)
+
+- Las seis variantes verificaron correctamente en las dos escalas ejecutadas (142.500 y 228.000 valores; cada par repetición × variable comprobado).
+- Cota alta del volumen del usuario (142.500 valores): escritura V2 filas largas 20,2 s; V4 filas anchas con lista 2,4 s; V6 filas anchas con objeto por identificador de variable 1,6 s. Lectura: 1,7 s frente a 0,11 s. La cota baja (13.500 valores) no se ha ejecutado.
+- Escala grande (228.000): V1 26,1 s; V2 23,2 s; V3 23,8 s; V4 2,1 s; V5 1,4 s; V6 1,4 s. V6 no mostró penalización frente a la lista.
+- Tres ejecuciones de V1–V5 a 228.000: sin diferencia sistemática entre variantes con y sin durabilidad relajada.
+- Guardar con el modelo actual (filas largas con índices, vaciando antes): 30–41 s a 228.000 valores en las cuatro mediciones.
+- Carpeta recordada: el navegador conserva la referencia entre sesiones; al abrir, el permiso figura como «prompt» y tras elegirla de nuevo, «granted». Guardado en carpeta con tamaño verificado.
+- Datos creados el 31/10 a las 20:33 UTC encontrados al abrir el 1/11 a las 15:43 UTC.
+- Persistencia: tercera respuesta «no».
+- Decisión pendiente D8: forma de guardar las repeticiones (filas largas frente a una fila por repetición con objeto por identificador de variable). No se ha cambiado el modelo.
+
 ## Cambios
 
 - 2026-10-31: fase 1a (prueba de viabilidad), versión `spike-1a`.
+- 2026-11-01: cuarta ronda, versión `spike-1a7`: ciclo automático copia → borrar → restaurar → verificar con tiempos por paso.
 - 2026-10-31: tercera ronda, versión `spike-1a6`: cronología de eventos e historiales en el informe, escalas basadas en el volumen del usuario, variante V6 (objeto por identificador de variable) informe del benchmark resumido y registro con errores y cancelaciones dentro del informe. El modelo de datos principal no se ha modificado.
 - 2026-10-31: segunda ronda, versión `spike-1a4`: benchmark de escritura con verificación por sesión y variable, y por cada par repetición × variable, contra los datos de origen, y registro de la durabilidad efectiva. El modelo de datos principal no se ha modificado.

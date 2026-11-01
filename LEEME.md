@@ -33,24 +33,20 @@ Probado por mí con datos sintéticos: la lógica de copia, compresión, cifrado
 
 **No se ha podido probar** lo que depende de un navegador real: la respuesta a la solicitud de persistencia, los selectores de ficheros y carpetas, la tolerancia al tamaño real, el comportamiento tras cerrar y reabrir, y que la política de seguridad bloquee la red. Eso es justo lo que comprueba esta prueba en tu portátil.
 
-## Tercera ronda (versión spike-1a6)
+## Cuarta ronda (versión spike-1a7)
 
-Sustituye en el repositorio estos cinco ficheros: `index.html`, `style.css`, `app.js`, `core.js` y `bench.js` (`db.js` no cambia). Recarga con Ctrl+F5 y comprueba que el informe indica `spike-1a6`. Si el informe sigue diciendo `spike-1a4` o `spike-1a5`, la página está usando ficheros antiguos. Tus datos de prueba anteriores se conservan.
+Cambian `index.html`, `app.js` y `core.js`; el resto no cambia respecto a la versión anterior. Sustitúyelos en el repositorio, recarga con Ctrl+F5 y comprueba que el informe indica `spike-1a7` (si pone otra versión, la página usa ficheros antiguos).
 
-Qué cambia:
+Novedad: la tarjeta 5 incluye un **ciclo automático** (copia en memoria → borrar → restaurar → verificar, sin cifrar y con gzip + cifrado) que mide cada paso con tus datos de prueba y lo deja registrado en el informe. Sustituye a los pasos manuales de borrar y restaurar, que no han llegado a quedar registrados en ningún informe.
 
-- **Informe con cronología.** Ahora incluye `eventos` (qué operaciones hiciste y en qué orden), el historial completo de copias (`copias`), de restauraciones (`restauraciones`: con recuentos antes y después, tiempo y si la verificación coincide), de borrados y de guardados en carpeta. El estado de la carpeta se registra por separado al abrir (`carpetaAlAbrir`), tras elegirla (`carpetaTrasElegir`) y tras guardar (`carpetaTrasGuardar`), para distinguir si el permiso se conserva entre sesiones.
-- **Benchmark con tu volumen.** Escalas basadas en lo que has indicado (4 temporadas × 25 jugadores = 100 temporadas-jugador, 15 sesiones cada una): cota alta (5 repeticiones y 19 variables por sesión, 142.500 valores), cota baja (3 repeticiones y 3 variables, 13.500 valores) y la escala grande anterior. Por defecto solo se ejecutan V2 (filas largas), V4 (filas anchas con lista) y la nueva V6 (filas anchas con un objeto por identificador de variable, v000…), porque V1, V3 y V5 ya están medidas; se pueden incluir con la casilla.
-- **Registro dentro del informe.** El informe incluye las últimas 120 líneas del registro (con los errores y las cancelaciones). Si cancelas un cuadro de confirmación, queda anotado.
-- **Informe del benchmark más corto.** Cada variante muestra los recuentos, las diferencias y si coinciden los resúmenes SHA-256; el detalle completo con ejemplos solo aparece si una verificación falla.
+Pasos (unos 5 minutos). No recargues la página entre ellos:
 
-Pasos (unos 15 minutos):
+1. Si la base está vacía, «Generar y guardar» con los valores por defecto.
+2. «Probar ciclo completo automático» y acepta el cuadro de confirmación. Tarda aproximadamente lo que tardó «Generar y guardar», dos veces.
+3. «Ejecutar benchmark» con la escala «cota baja» (la que aún no has medido). Con las variantes por defecto.
+4. Restauración desde un fichero real: en la tarjeta 5 elige una de las copias guardadas en tu carpeta, «Leer y validar», «Restaurar» y acepta la confirmación.
+5. «Copiar informe» y pégalo en el chat.
 
-1. **Ciclo de restauración.** No recargues la página entre un paso y otro (el informe solo recoge lo ocurrido desde que se abrió). Con datos de prueba en la base: «Guardar copia (elegir ubicación)»; «Borrar datos de prueba»; en la tarjeta 5 elige esa copia, «Leer y validar», «Restaurar» y acepta el cuadro de confirmación. Debe indicar que la verificación coincide.
-2. **Copia cifrada.** Marca «Cifrar con contraseña» (8 caracteres o más), guarda una copia, borra los datos y restáurala con su contraseña.
-3. **Carpeta recordada.** «Elegir carpeta» (si ya hay una, vale la recordada). Cierra todas las ventanas de Chrome, reábrelo, abre la URL y pulsa «Guardar copia en la carpeta recordada».
-4. **Persistencia (opcional).** Guarda la página en favoritos y pulsa de nuevo «Solicitar persistencia».
-5. **Benchmark.** Escala «cota alta» con las variantes por defecto, y después «cota baja». Sin cerrar la pestaña.
-6. «Copiar informe» y pégalo en el chat.
+Opcional: guarda la página en favoritos y pulsa «Solicitar persistencia» otra vez; y, tras cerrar todo Chrome y reabrirlo, pulsa «Guardar copia en la carpeta recordada» sin volver a elegir la carpeta (ahora solo has guardado después de elegirla de nuevo).
 
-Pruebas realizadas por mí (Node con IndexedDB simulada, escala reducida): las seis variantes verifican; se detectan intercambios dentro de una repetición y entre repeticiones de la misma sesión, filas o claves perdidas, claves sobrantes, pares duplicados y cambios de 0,001; y se cubren los casos de durabilidad. La copia, el cifrado, la restauración y la reversión de una restauración fallida también están probados. No he ejecutado el benchmark completo, porque depende de tu Chrome.
+Pruebas realizadas por mí (Node con IndexedDB simulada, escala reducida): el ciclo, las seis variantes del benchmark, los casos de alteración, la copia con y sin cifrado, la reversión de una restauración fallida y la cancelación de cuadros de confirmación. Lo que depende de tu Chrome (tiempos, permisos) solo puede medirlo él.

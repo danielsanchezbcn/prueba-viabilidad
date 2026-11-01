@@ -420,6 +420,67 @@ async function restore() {
   await showEnv();
 }
 
+// ---------- 5b. Ciclo automático: copia → borrar → restaurar → verificar ----------
+
+async function runCycle() {
+  const before = await db.countAll(database);
+  if (!before.repvalues) throw new Error('No hay datos de prueba: genera datos primero.');
+  if (!confirm(`Se hará una copia en memoria, se borrarán los datos de prueba (${fmt(before.repvalues)} valores), se restaurarán desde esa copia y se verificará el resultado, dos veces: sin cifrar y con gzip + cifrado. Si algo falla, los datos de prueba pueden quedar vacíos (son sintéticos). ¿Continuar?`)) {
+    log('Ciclo cancelado en el cuadro de confirmación.');
+    evento('cancelado', { operacion: 'ciclo' });
+    setStatus('cycle-status', 'Ciclo cancelado: no se ha tocado nada.', 'warn');
+    return;
+  }
+  const modes = [
+    { modo: 'sin cifrar ni comprimir', gzip: false, password: '' },
+    { modo: 'gzip + cifrada (contraseña de prueba)', gzip: true, password: 'ciclo-de-prueba-1' },
+  ];
+  const out = [];
+  for (const m of modes) {
+    setStatus('cycle-status', `Ciclo «${m.modo}» en curso… no cierres la pestaña.`);
+    const ms = {};
+    let t = performance.now();
+    const lap = (k) => {
+      const n = performance.now();
+      ms[k] = Math.round(n - t);
+      t = n;
+    };
+    const tables = await db.readAll(database);
+    lap('leer');
+    const inner = await core.buildBackup(tables);
+    lap('construirCopia');
+    const { blob } = await core.encodeBackup(inner, { gzip: m.gzip, password: m.password });
+    lap('codificar');
+    const decoded = await core.decodeBackupObject(core.inspectBackupText(await blob.text()), m.password);
+    lap('decodificar');
+    const v = await core.validateBackup(decoded.inner);
+    lap('validar');
+    if (!v.ok) throw new Error('La copia en memoria no es válida: ' + v.errors.join(' '));
+    await db.clearAll(database);
+    lap('borrar');
+    const empty = Object.values(await db.countAll(database)).every((n) => n === 0);
+    try {
+      await db.replaceAll(database, decoded.inner.tables);
+    } catch (e) {
+      log('La restauración falló: los datos de prueba pueden haber quedado vacíos. ' + (e?.message || e), 'error');
+      throw e;
+    }
+    lap('restaurar');
+    const after = await db.readAll(database);
+    const same = (await core.checksumTables(after)) === inner.checksum;
+    lap('verificar');
+    const entry = { modo: m.modo, tamanoCopia: mb(blob.size), vaciaTrasBorrar: empty, checksumCoincide: same, recuentosTras: core.countTables(after), ms };
+    out.push(entry);
+    log(`Ciclo «${m.modo}»: copia ${mb(blob.size)} · borrar ${fmt(ms.borrar)} ms · restaurar ${fmt(ms.restaurar)} ms · verificación ${same ? 'idéntica a la copia' : 'NO coincide'}`, same && empty ? 'ok' : 'error');
+  }
+  (results.ciclos ??= []).push({ momento: new Date().toISOString(), recuentosInicio: before, resultados: out });
+  evento('ciclo', { ok: out.every((e) => e.checksumCoincide && e.vaciaTrasBorrar), restaurar: out.map((e) => ({ modo: e.modo, msRestaurar: e.ms.restaurar })) });
+  const ok = out.every((e) => e.checksumCoincide && e.vaciaTrasBorrar);
+  setStatus('cycle-status', (ok ? 'Correcto: ' : 'Fallo: ') + out.map((e) => `«${e.modo}»: restaurar ${(e.ms.restaurar / 1000).toFixed(1)} s, verificación ${e.checksumCoincide ? 'idéntica' : 'NO coincide'}`).join(' · '), ok ? 'ok' : 'fail');
+  await refreshFound();
+  await showEnv();
+}
+
 // ---------- 6. CSP ----------
 
 async function testCsp() {
@@ -545,6 +606,7 @@ function wire() {
   on('btn-save-dir', saveToRememberedDir, ['btn-save']);
   on('btn-read', readAndValidate);
   on('btn-restore', restore, ['btn-read']);
+  on('btn-cycle', runCycle, ['btn-gen', 'btn-del', 'btn-save', 'btn-read', 'btn-restore', 'btn-bench']);
   on('btn-csp', testCsp);
   on('btn-bench', runBenchmark);
   on('btn-report', copyReport);

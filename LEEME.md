@@ -22,7 +22,7 @@ Usa una ventana normal, no privada. Abre la página con Chrome o Edge.
 4. **Copia.** Pulsa «Guardar copia (elegir ubicación)» y guárdala en el USB. Repite en la carpeta sincronizada con la nube. Prueba también una copia comprimida y otra cifrada (contraseña de 8 caracteres o más).
 5. **Carpeta recordada.** Pulsa «Elegir carpeta», escoge una, y luego «Guardar copia en la carpeta recordada». Si Chrome o Edge rechaza una carpeta, anótalo en el informe.
 6. **Cierre y reapertura.** Cierra todas las ventanas del navegador, ábrelo de nuevo, abre la URL y comprueba que la tarjeta 3 dice que hay datos de una sesión anterior. Mira si la carpeta recordada pide volver a conceder permiso (es lo esperable).
-7. **Restauración.** Pulsa «Borrar datos de prueba». Después, en la tarjeta 5, elige una copia, pulsa «Leer y validar», revisa el resumen y «Restaurar». Debe indicar que la verificación coincide.
+7. **Restauración.** Pulsa «Borrar datos de prueba». Después, en la tarjeta 5, elige una copia, pulsa «Leer y validar», revisa el resumen y «Restaurar» y acepta el cuadro de confirmación. Debe indicar que la verificación coincide.
 8. **Otro navegador o perfil (opcional).** Abre la URL en otro perfil o navegador: no deben aparecer los datos hasta que restaures una copia.
 9. **Red.** Pulsa «Probar bloqueo de red»: debe decir «Correcto».
 10. **Informe.** Pulsa «Copiar informe» y pégalo en el chat. No contiene datos de jugadores.
@@ -33,19 +33,20 @@ Probado por mí con datos sintéticos: la lógica de copia, compresión, cifrado
 
 **No se ha podido probar** lo que depende de un navegador real: la respuesta a la solicitud de persistencia, los selectores de ficheros y carpetas, la tolerancia al tamaño real, el comportamiento tras cerrar y reabrir, y que la política de seguridad bloquee la red. Eso es justo lo que comprueba esta prueba en tu portátil.
 
-## Tercera ronda (versión spike-1a5)
+## Tercera ronda (versión spike-1a6)
 
-Sustituye en el repositorio estos cinco ficheros: `index.html`, `style.css`, `app.js`, `core.js` y `bench.js` (`db.js` no cambia). Recarga con Ctrl+F5 y comprueba que el informe indica `spike-1a5`. Tus datos de prueba anteriores se conservan.
+Sustituye en el repositorio estos cinco ficheros: `index.html`, `style.css`, `app.js`, `core.js` y `bench.js` (`db.js` no cambia). Recarga con Ctrl+F5 y comprueba que el informe indica `spike-1a6`. Si el informe sigue diciendo `spike-1a4` o `spike-1a5`, la página está usando ficheros antiguos. Tus datos de prueba anteriores se conservan.
 
 Qué cambia:
 
 - **Informe con cronología.** Ahora incluye `eventos` (qué operaciones hiciste y en qué orden), el historial completo de copias (`copias`), de restauraciones (`restauraciones`: con recuentos antes y después, tiempo y si la verificación coincide), de borrados y de guardados en carpeta. El estado de la carpeta se registra por separado al abrir (`carpetaAlAbrir`), tras elegirla (`carpetaTrasElegir`) y tras guardar (`carpetaTrasGuardar`), para distinguir si el permiso se conserva entre sesiones.
 - **Benchmark con tu volumen.** Escalas basadas en lo que has indicado (4 temporadas × 25 jugadores = 100 temporadas-jugador, 15 sesiones cada una): cota alta (5 repeticiones y 19 variables por sesión, 142.500 valores), cota baja (3 repeticiones y 3 variables, 13.500 valores) y la escala grande anterior. Por defecto solo se ejecutan V2 (filas largas), V4 (filas anchas con lista) y la nueva V6 (filas anchas con un objeto por identificador de variable, v000…), porque V1, V3 y V5 ya están medidas; se pueden incluir con la casilla.
+- **Registro dentro del informe.** El informe incluye las últimas 120 líneas del registro (con los errores y las cancelaciones). Si cancelas un cuadro de confirmación, queda anotado.
 - **Informe del benchmark más corto.** Cada variante muestra los recuentos, las diferencias y si coinciden los resúmenes SHA-256; el detalle completo con ejemplos solo aparece si una verificación falla.
 
 Pasos (unos 15 minutos):
 
-1. **Ciclo de restauración.** Con datos de prueba en la base: «Guardar copia (elegir ubicación)»; «Borrar datos de prueba»; en la tarjeta 5 elige esa copia, «Leer y validar», «Restaurar». Debe indicar que la verificación coincide.
+1. **Ciclo de restauración.** No recargues la página entre un paso y otro (el informe solo recoge lo ocurrido desde que se abrió). Con datos de prueba en la base: «Guardar copia (elegir ubicación)»; «Borrar datos de prueba»; en la tarjeta 5 elige esa copia, «Leer y validar», «Restaurar» y acepta el cuadro de confirmación. Debe indicar que la verificación coincide.
 2. **Copia cifrada.** Marca «Cifrar con contraseña» (8 caracteres o más), guarda una copia, borra los datos y restáurala con su contraseña.
 3. **Carpeta recordada.** «Elegir carpeta» (si ya hay una, vale la recordada). Cierra todas las ventanas de Chrome, reábrelo, abre la URL y pulsa «Guardar copia en la carpeta recordada».
 4. **Persistencia (opcional).** Guarda la página en favoritos y pulsa de nuevo «Solicitar persistencia».

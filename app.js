@@ -170,7 +170,11 @@ async function generate() {
     seed: 1,
   };
   const existing = await db.countAll(database);
-  if (existing.players > 0 && !confirm('Ya hay datos de prueba. Generar nuevos datos los reemplaza. ¿Continuar?')) return;
+  if (existing.players > 0 && !confirm('Ya hay datos de prueba. Generar nuevos datos los reemplaza. ¿Continuar?')) {
+    log('Generación cancelada en el cuadro de confirmación.');
+    evento('cancelado', { operacion: 'generacion' });
+    return;
+  }
   setStatus('data-status', 'Generando y guardando… puede tardar unos segundos.');
   const usoAntes = (await navigator.storage?.estimate?.())?.usage ?? null;
   const t0 = performance.now();
@@ -205,7 +209,11 @@ async function countRecords() {
 }
 
 async function deleteData() {
-  if (!confirm('Se borrarán todos los datos de prueba de este navegador (no la carpeta recordada). ¿Continuar?')) return;
+  if (!confirm('Se borrarán todos los datos de prueba de este navegador (no la carpeta recordada). ¿Continuar?')) {
+    log('Borrado cancelado en el cuadro de confirmación.');
+    evento('cancelado', { operacion: 'borrado' });
+    return;
+  }
   const antes = await db.countAll(database);
   const t0 = performance.now();
   await db.clearAll(database);
@@ -388,7 +396,12 @@ async function restore() {
   const current = await db.countAll(database);
   const incoming = pendingRestore.summary.counts;
   const ok = confirm(`Se reemplazarán los datos actuales (${fmt(current.repvalues)} valores) por los de la copia (${fmt(incoming.repvalues)} valores, creada el ${new Date(pendingRestore.summary.createdAt).toLocaleString('es-ES')}). ¿Continuar?`);
-  if (!ok) return;
+  if (!ok) {
+    log('Restauración cancelada en el cuadro de confirmación: no se ha restaurado nada.');
+    evento('cancelado', { operacion: 'restauracion', fichero: pendingRestore.fileName });
+    setStatus('restore-status', 'Restauración cancelada: no se ha restaurado nada. Pulsa «Restaurar» de nuevo y acepta el cuadro de confirmación.', 'warn');
+    return;
+  }
   const t0 = performance.now();
   await db.replaceAll(database, pendingRestore.inner.tables);
   const t1 = performance.now();
@@ -504,6 +517,7 @@ async function runBenchmark() {
 
 async function copyReport() {
   await showEnv();
+  results.registro = $('log').textContent.trim().split('\n').slice(-120); // últimas líneas del registro, incluidos los errores
   const header = `Informe de la prueba de viabilidad 1a · ${new Date().toLocaleString('es-ES')} · versión ${core.APP_VERSION}\n(solo datos sintéticos; no contiene datos de jugadores)\n\n`;
   const text = header + JSON.stringify(results, null, 2);
   const area = $('report');

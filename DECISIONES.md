@@ -24,10 +24,11 @@
 - Las cinco variantes del benchmark verificaron correctamente (228.000 valores, 228.000 pares repetición × variable, resúmenes SHA-256 coincidentes).
 - Escritura de 228.000 valores: filas largas ≈26 s (con o sin índices; la durabilidad relajada no mostró mejora apreciable en una sola medición); filas anchas ≈1,8 s. Lectura: ≈1,3–2,5 s frente a ≈0,12 s.
 - Persistencia: Chrome respondió «no» a la solicitud.
-- Datos encontrados al reabrir la página: sí. Ciclo completo de restauración, copia cifrada y carpeta recordada entre sesiones: pendientes de registrar.
+- Datos encontrados al reabrir la página: sí (creados a las 14:36 UTC y presentes al abrir a las 20:29 UTC, más de seis horas después). Ciclo completo de restauración, copia cifrada y carpeta recordada entre sesiones: pendientes de registrar.
+- Repetición del benchmark (misma versión, segunda ejecución): V1 25,2 s, V2 22,3 s, V3 22,6 s, V4 1,8 s, V5 1,7 s; variación entre ejecuciones del 4 al 18 % en las filas largas.
 
 ## Cambios
 
 - 2026-10-31: fase 1a (prueba de viabilidad), versión `spike-1a`.
-- 2026-10-31: tercera ronda, versión `spike-1a5`: cronología de eventos e historiales en el informe, escalas basadas en el volumen del usuario, variante V6 (objeto por identificador de variable) y informe del benchmark resumido. El modelo de datos principal no se ha modificado.
+- 2026-10-31: tercera ronda, versión `spike-1a6`: cronología de eventos e historiales en el informe, escalas basadas en el volumen del usuario, variante V6 (objeto por identificador de variable) informe del benchmark resumido y registro con errores y cancelaciones dentro del informe. El modelo de datos principal no se ha modificado.
 - 2026-10-31: segunda ronda, versión `spike-1a4`: benchmark de escritura con verificación por sesión y variable, y por cada par repetición × variable, contra los datos de origen, y registro de la durabilidad efectiva. El modelo de datos principal no se ha modificado.
